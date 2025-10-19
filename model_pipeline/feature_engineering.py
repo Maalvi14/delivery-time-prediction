@@ -117,7 +117,7 @@ class FeatureEngineer:
             default_speed = float(np.mean(list(self.config.vehicle_speeds.values())))
             df_domain['Estimated_Speed_kmh'] = (
                 df_domain['Estimated_Speed_kmh']
-                .astype('float64')
+                .astype('float64')  # Keep float64 for precision during calculations
                 .fillna(default_speed)
             )
             # Guard against zero or negative speeds
@@ -126,7 +126,7 @@ class FeatureEngineer:
         
         # Time per kilometer (speed factor)
         if 'Estimated_Speed_kmh' in df_domain.columns:
-            df_domain['Time_per_km'] = 60.0 / df_domain['Estimated_Speed_kmh'].astype('float64')
+            df_domain['Time_per_km'] = 60.0 / df_domain['Estimated_Speed_kmh']
             self.logger.debug("Created Time_per_km feature")
         
         # Estimated travel time
@@ -330,8 +330,8 @@ class FeatureSelector:
         if not cat_cols:
             return df
         
-        # One-hot encode
-        df_encoded = pd.get_dummies(df, columns=cat_cols, drop_first=drop_first)
+        # One-hot encode with memory-efficient dtype
+        df_encoded = pd.get_dummies(df, columns=cat_cols, drop_first=drop_first, dtype='uint8')
         
         self.logger.info(
             f"Encoded {len(cat_cols)} categorical features: "
@@ -339,4 +339,55 @@ class FeatureSelector:
         )
         
         return df_encoded
-
+    
+    def optimize_memory(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Apply memory optimization by downcasting data types.
+        This should be called after all feature engineering is complete.
+        
+        Args:
+            df: Input DataFrame with all features
+            
+        Returns:
+            DataFrame with optimized memory usage
+        """
+        if not self.config.enable_memory_optimization:
+            return df
+            
+        df_optimized = df.copy()
+        
+        # Get memory usage before optimization
+        memory_before = df_optimized.memory_usage(deep=True).sum() / 1024
+        
+        # Downcast integer columns
+        int_cols = df_optimized.select_dtypes(include=['int64']).columns
+        for col in int_cols:
+            if col in df_optimized.columns:
+                col_min = df_optimized[col].min()
+                col_max = df_optimized[col].max()
+                
+                if col_min >= -32768 and col_max <= 32767:
+                    df_optimized[col] = df_optimized[col].astype('int16')
+                    self.logger.debug(f"Downcasted {col} from int64 to int16")
+                elif col_min >= -2147483648 and col_max <= 2147483647:
+                    df_optimized[col] = df_optimized[col].astype('int32')
+                    self.logger.debug(f"Downcasted {col} from int64 to int32")
+        
+        # Downcast float columns to float32 (safe for final features)
+        float_cols = df_optimized.select_dtypes(include=['float64']).columns
+        for col in float_cols:
+            if col in df_optimized.columns:
+                df_optimized[col] = df_optimized[col].astype('float32')
+                self.logger.debug(f"Downcasted {col} from float64 to float32")
+        
+        # Get memory usage after optimization
+        memory_after = df_optimized.memory_usage(deep=True).sum() / 1024
+        memory_saved = memory_before - memory_after
+        memory_saved_pct = (memory_saved / memory_before) * 100 if memory_before > 0 else 0
+        
+        self.logger.info(
+            f"Memory optimization: {memory_before:.2f} KB → {memory_after:.2f} KB "
+            f"({memory_saved:.2f} KB saved, {memory_saved_pct:.1f}% reduction)"
+        )
+        
+        return df_optimized

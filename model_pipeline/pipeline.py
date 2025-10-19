@@ -175,6 +175,9 @@ class DeliveryTimePipeline:
         # Encode categorical variables
         X_encoded = self.feature_selector.encode_categorical(X, drop_first=True)
         
+        # Apply memory optimization after all feature engineering is complete
+        X_encoded = self.feature_selector.optimize_memory(X_encoded)
+        
         print(f"\nAfter encoding:")
         print(f"  Features: {X_encoded.shape}")
         

@@ -191,7 +191,7 @@ class DataPreprocessor:
     
     def _convert_data_types(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Convert data types for categorical columns.
+        Convert data types for categorical columns and optimize memory usage.
         
         Args:
             df: Input DataFrame
@@ -209,7 +209,67 @@ class DataPreprocessor:
                 df_converted[col] = df_converted[col].astype('category')
                 self.logger.debug(f"Converted {col} to category type")
         
+        # Note: Downcasting is now handled at the final stage to preserve precision
+        # during feature engineering calculations
+        
         return df_converted
+    
+    def _downcast_dtypes(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Downcast data types to more memory-efficient types.
+        
+        Args:
+            df: Input DataFrame
+            
+        Returns:
+            DataFrame with downcasted data types
+        """
+        df_downcast = df.copy()
+        
+        # Get memory usage before downcasting
+        memory_before = df_downcast.memory_usage(deep=True).sum() / 1024
+        
+        # Downcast integer columns
+        int_cols = df_downcast.select_dtypes(include=['int64']).columns
+        for col in int_cols:
+            if col in df_downcast.columns:
+                # Check if values fit in int16 range (-32,768 to 32,767)
+                col_min = df_downcast[col].min()
+                col_max = df_downcast[col].max()
+                
+                if col_min >= -32768 and col_max <= 32767:
+                    df_downcast[col] = df_downcast[col].astype('int16')
+                    self.logger.debug(f"Downcasted {col} from int64 to int16")
+                elif col_min >= -2147483648 and col_max <= 2147483647:
+                    df_downcast[col] = df_downcast[col].astype('int32')
+                    self.logger.debug(f"Downcasted {col} from int64 to int32")
+        
+        # Downcast float columns
+        float_cols = df_downcast.select_dtypes(include=['float64']).columns
+        for col in float_cols:
+            if col in df_downcast.columns:
+                # Check if values fit in float32 range
+                col_min = df_downcast[col].min()
+                col_max = df_downcast[col].max()
+                
+                # Use float32 if values are within reasonable range
+                # (float32 has ~7 decimal digits of precision)
+                if (col_min >= -3.4e38 and col_max <= 3.4e38 and 
+                    abs(col_min) < 1e7 and abs(col_max) < 1e7):
+                    df_downcast[col] = df_downcast[col].astype('float32')
+                    self.logger.debug(f"Downcasted {col} from float64 to float32")
+        
+        # Get memory usage after downcasting
+        memory_after = df_downcast.memory_usage(deep=True).sum() / 1024
+        memory_saved = memory_before - memory_after
+        memory_saved_pct = (memory_saved / memory_before) * 100
+        
+        self.logger.info(
+            f"Memory optimization: {memory_before:.2f} KB → {memory_after:.2f} KB "
+            f"({memory_saved:.2f} KB saved, {memory_saved_pct:.1f}% reduction)"
+        )
+        
+        return df_downcast
     
     def get_data_summary(self, df: pd.DataFrame) -> Dict:
         """

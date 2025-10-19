@@ -25,6 +25,9 @@ class Config:
     outlier_method: str = 'iqr'  # 'iqr' or 'zscore'
     outlier_threshold: float = 1.5  # IQR multiplier
     
+    # Memory optimization
+    enable_memory_optimization: bool = True  # Enable downcasting to float32/int16
+    
     # Feature engineering
     vehicle_speeds: Dict[str, int] = field(default_factory=lambda: {
         'Bike': 15,      # km/h average city speed
