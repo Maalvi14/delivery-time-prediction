@@ -44,10 +44,17 @@ delivery-time-prediction/
 │       ├── train_model.py
 │       ├── make_predictions.py
 │       └── custom_pipeline.py
+├── api/                           # FastAPI application
+│   ├── __init__.py
+│   ├── app.py                     # Main FastAPI application
+│   ├── models.py                  # Pydantic models
+│   ├── predictor_service.py        # Predictor service wrapper
+│   └── config.py                  # API configuration
 ├── models/                         # Saved models
 ├── results/                        # Model results
 ├── logs/                          # Pipeline logs
 ├── test_pipeline.py               # Pipeline test script
+├── run_api.py                     # API server startup script
 └── README.md                      # This file
 ```
 
@@ -106,6 +113,370 @@ delivery_time = predictor.predict_single(
 )
 
 print(f"Predicted delivery time: {delivery_time:.1f} minutes")
+```
+
+## 🌐 API Usage
+
+### Start the API Server
+
+```bash
+# Start the FastAPI server
+python run_api.py
+```
+
+The server will start on `http://localhost:8000` by default. API documentation is available at `http://localhost:8000/docs`.
+
+### Model Auto-Discovery
+
+The API automatically discovers and uses the first available model in the `models/` directory:
+
+- **Auto-discovery**: Scans `models/` directory for `.pkl` files
+- **Consistent ordering**: Uses alphabetical sorting for predictable model selection
+- **Fallback**: Falls back to `ridge_regression.pkl` if no models found
+- **Override**: Can be overridden with `MODEL_PATH` environment variable
+
+**Example scenarios:**
+- If `models/` contains `[ridge_regression.pkl, random_forest.pkl, xgboost.pkl]` → Uses `ridge_regression.pkl`
+- If `models/` contains `[random_forest.pkl, xgboost.pkl]` → Uses `random_forest.pkl`
+- If `models/` is empty → Falls back to `ridge_regression.pkl` (will fail if not found)
+
+### Configuration
+
+Configure the API using environment variables:
+
+```bash
+# Model path (default: auto-discovers first .pkl file in models/ directory)
+export MODEL_PATH="path/to/your/model.pkl"
+
+# Server configuration
+export API_HOST="0.0.0.0"
+export API_PORT="8000"
+export API_DEBUG="false"
+
+# CORS origins (comma-separated)
+export CORS_ORIGINS="http://localhost:3000,http://localhost:8080"
+
+# Logging
+export LOG_LEVEL="INFO"
+```
+
+### API Endpoints
+
+#### Health Check
+```bash
+GET /health
+```
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "model_loaded": true,
+  "model_name": "Ridge Regression",
+  "timestamp": "2024-01-15T10:30:00Z"
+}
+```
+
+#### Model Information
+```bash
+GET /model/info
+```
+
+**Response:**
+```json
+{
+  "model_name": "Ridge Regression",
+  "feature_names": [
+    "Distance_km",
+    "Preparation_Time_min",
+    "Courier_Experience_yrs",
+    "Estimated_Speed_kmh",
+    "Travel_Time_min",
+    "Total_Time_min",
+    "Is_Rush_Hour",
+    "Is_Bad_Weather",
+    "Is_High_Traffic",
+    "Experience_Level_Intermediate",
+    "Distance_Category_Medium",
+    "Weather_Traffic_Interaction",
+    "Vehicle_Traffic_Interaction"
+  ],
+  "num_features": 13,
+  "model_type": "Ridge",
+  "is_preprocessing_available": true
+}
+```
+
+#### Available Models
+```bash
+GET /models/available
+```
+
+**Response:**
+```json
+{
+  "available_models": ["ridge_regression", "random_forest", "xgboost"],
+  "current_model": "ridge_regression",
+  "total_models": 3
+}
+```
+
+#### Single Prediction (Raw Input)
+```bash
+POST /predict
+```
+
+**Request Body (Raw Input):**
+```json
+{
+  "Order_ID": 1001,
+  "Distance_km": 10.5,
+  "Weather": "Clear",
+  "Traffic_Level": "Medium",
+  "Time_of_Day": "Evening",
+  "Vehicle_Type": "Bike",
+  "Preparation_Time_min": 15.0,
+  "Courier_Experience_yrs": 3.5
+}
+```
+
+**Response:**
+```json
+{
+  "predicted_delivery_time": 45.2,
+  "model_name": "Ridge Regression"
+}
+```
+
+
+#### Batch Predictions
+```bash
+POST /predict/batch
+```
+
+**Request Body:**
+```json
+[
+  {
+    "Order_ID": 1001,
+    "Distance_km": 10.5,
+    "Weather": "Clear",
+    "Traffic_Level": "Medium",
+    "Time_of_Day": "Evening",
+    "Vehicle_Type": "Bike",
+    "Preparation_Time_min": 15.0,
+    "Courier_Experience_yrs": 3.5
+  },
+  {
+    "Order_ID": 1002,
+    "Distance_km": 5.2,
+    "Weather": "Rainy",
+    "Traffic_Level": "High",
+    "Time_of_Day": "Morning",
+    "Vehicle_Type": "Scooter",
+    "Preparation_Time_min": 20.0,
+    "Courier_Experience_yrs": 5.0
+  }
+]
+```
+
+**Response:**
+```json
+{
+  "predictions": [
+    {
+      "predicted_delivery_time": 45.2,
+      "model_name": "Ridge Regression"
+    },
+    {
+      "predicted_delivery_time": 38.7,
+      "model_name": "Ridge Regression"
+    }
+  ],
+  "total_orders": 2,
+  "model_name": "Ridge Regression"
+}
+```
+
+### Input Types
+
+#### Raw Input (Recommended)
+- **Use when:** You have original order data (distance, weather, etc.)
+- **Advantage:** Automatic preprocessing and feature engineering
+- **Required fields:** Distance_km, Weather, Traffic_Level, Time_of_Day, Vehicle_Type, Preparation_Time_min, Courier_Experience_yrs
+- **Optional fields:** Order_ID
+
+### Error Handling
+
+The API returns appropriate HTTP status codes:
+
+- **200 OK:** Successful prediction
+- **404 Not Found:** Model not loaded or endpoint not found
+- **422 Unprocessable Entity:** Invalid input data
+- **500 Internal Server Error:** Prediction failure
+
+**Error Response Format:**
+```json
+{
+  "error": "Model not found",
+  "detail": "No trained model found at the specified path",
+  "timestamp": "2024-01-15T10:30:00Z"
+}
+```
+
+### Example Usage with curl
+
+```bash
+# Health check
+curl http://localhost:8000/health
+
+# Model info
+curl http://localhost:8000/model/info
+
+# Single prediction
+curl -X POST "http://localhost:8000/predict" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "Distance_km": 10.5,
+    "Weather": "Clear",
+    "Traffic_Level": "Medium",
+    "Time_of_Day": "Evening",
+    "Vehicle_Type": "Bike",
+    "Preparation_Time_min": 15.0,
+    "Courier_Experience_yrs": 3.5
+  }'
+
+# Batch prediction
+curl -X POST "http://localhost:8000/predict/batch" \
+  -H "Content-Type: application/json" \
+  -d '[
+    {
+      "Distance_km": 10.5,
+      "Weather": "Clear",
+      "Traffic_Level": "Medium",
+      "Time_of_Day": "Evening",
+      "Vehicle_Type": "Bike",
+      "Preparation_Time_min": 15.0,
+      "Courier_Experience_yrs": 3.5
+    },
+    {
+      "Distance_km": 5.2,
+      "Weather": "Rainy",
+      "Traffic_Level": "High",
+      "Time_of_Day": "Morning",
+      "Vehicle_Type": "Scooter",
+      "Preparation_Time_min": 20.0,
+      "Courier_Experience_yrs": 5.0
+    }
+  ]'
+```
+
+### Pretty-Printing CLI Output
+
+For better readability when testing from the command line, you can pipe the output through `jq` to format the JSON response:
+
+```bash
+# Install jq (if not already installed)
+# macOS: brew install jq
+# Ubuntu/Debian: sudo apt install jq
+# Windows: choco install jq
+
+# Pretty-printed single prediction
+curl -X POST "http://localhost:8000/predict" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "Distance_km": 10.5,
+    "Weather": "Clear",
+    "Traffic_Level": "Medium",
+    "Time_of_Day": "Evening",
+    "Vehicle_Type": "Bike",
+    "Preparation_Time_min": 15.0,
+    "Courier_Experience_yrs": 3.5
+  }' | jq
+
+# Pretty-printed batch prediction
+curl -X POST "http://localhost:8000/predict/batch" \
+  -H "Content-Type: application/json" \
+  -d '[
+    {
+      "Distance_km": 10.5,
+      "Weather": "Clear",
+      "Traffic_Level": "Medium",
+      "Time_of_Day": "Evening",
+      "Vehicle_Type": "Bike",
+      "Preparation_Time_min": 15.0,
+      "Courier_Experience_yrs": 3.5
+    }
+  ]' | jq
+```
+
+**Alternative to jq:** You can also use `python -m json.tool` for pretty-printing:
+```bash
+curl -X POST "http://localhost:8000/predict" \
+  -H "Content-Type: application/json" \
+  -d '{"Distance_km": 10.5, "Weather": "Clear", "Traffic_Level": "Medium", "Time_of_Day": "Evening", "Vehicle_Type": "Bike", "Preparation_Time_min": 15.0, "Courier_Experience_yrs": 3.5}' | python -m json.tool
+```
+
+### Python Client Example
+
+```python
+import requests
+import json
+
+# API base URL
+BASE_URL = "http://localhost:8000"
+
+# Health check
+response = requests.get(f"{BASE_URL}/health")
+print("API Status:", response.json())
+
+# Model info
+response = requests.get(f"{BASE_URL}/model/info")
+model_info = response.json()
+print("Model:", model_info["model_name"])
+print("Features:", model_info["num_features"])
+
+# Single prediction
+order_data = {
+    "Distance_km": 10.5,
+    "Weather": "Clear",
+    "Traffic_Level": "Medium",
+    "Time_of_Day": "Evening",
+    "Vehicle_Type": "Bike",
+    "Preparation_Time_min": 15.0,
+    "Courier_Experience_yrs": 3.5
+}
+
+response = requests.post(f"{BASE_URL}/predict", json=order_data)
+prediction = response.json()
+print(f"Predicted delivery time: {prediction['predicted_delivery_time']:.1f} minutes")
+
+# Batch prediction
+orders_data = [
+    {
+        "Distance_km": 10.5,
+        "Weather": "Clear",
+        "Traffic_Level": "Medium",
+        "Time_of_Day": "Evening",
+        "Vehicle_Type": "Bike",
+        "Preparation_Time_min": 15.0,
+        "Courier_Experience_yrs": 3.5
+    },
+    {
+        "Distance_km": 5.2,
+        "Weather": "Rainy",
+        "Traffic_Level": "High",
+        "Time_of_Day": "Morning",
+        "Vehicle_Type": "Scooter",
+        "Preparation_Time_min": 20.0,
+        "Courier_Experience_yrs": 5.0
+    }
+]
+
+response = requests.post(f"{BASE_URL}/predict/batch", json=orders_data)
+batch_predictions = response.json()
+for i, pred in enumerate(batch_predictions["predictions"]):
+    print(f"Order {i+1}: {pred['predicted_delivery_time']:.1f} minutes")
 ```
 
 ## 📊 Data Pipeline
@@ -320,10 +691,14 @@ Data Science Team
 - [ ] Hyperparameter tuning with GridSearch/RandomSearch
 - [ ] Feature selection optimization
 - [ ] Ensemble methods
-- [ ] Real-time prediction API
+- [x] Real-time prediction API
 - [ ] Model monitoring and drift detection
 - [ ] A/B testing framework
 - [ ] Integration with delivery platforms
+- [ ] API authentication and rate limiting
+- [ ] Model versioning and rollback capabilities
+- [ ] Prometheus metrics integration
+- [ ] Docker containerization
 
 ## 📞 Support
 

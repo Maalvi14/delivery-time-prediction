@@ -220,15 +220,21 @@ class ModelTrainer:
         self,
         model: Any,
         model_name: str,
-        filepath: str = None
+        filepath: str = None,
+        preprocessor: Any = None,
+        feature_engineer: Any = None,
+        feature_selector: Any = None
     ) -> str:
         """
-        Save a trained model to disk.
+        Save a trained model to disk with preprocessing pipeline components.
         
         Args:
             model: Trained model
             model_name: Name of the model
             filepath: Path to save model (optional)
+            preprocessor: Fitted preprocessor instance
+            feature_engineer: Fitted feature engineer instance
+            feature_selector: Fitted feature selector instance
             
         Returns:
             Path where model was saved
@@ -240,12 +246,15 @@ class ModelTrainer:
         
         filepath.parent.mkdir(parents=True, exist_ok=True)
         
-        # Save model and scaler together
+        # Save model, scaler, and preprocessing components
         model_data = {
             'model': model,
             'scaler': self.scaler,
             'feature_names': self.feature_names_,
-            'model_name': model_name
+            'model_name': model_name,
+            'preprocessor': preprocessor,
+            'feature_engineer': feature_engineer,
+            'feature_selector': feature_selector
         }
         
         joblib.dump(model_data, filepath)
@@ -253,15 +262,15 @@ class ModelTrainer:
         
         return str(filepath)
     
-    def load_model(self, filepath: str) -> Tuple[Any, StandardScaler, List[str], str]:
+    def load_model(self, filepath: str) -> Tuple[Any, StandardScaler, List[str], str, Any, Any, Any]:
         """
-        Load a trained model from disk.
+        Load a trained model from disk with preprocessing components.
         
         Args:
             filepath: Path to saved model
             
         Returns:
-            Tuple of (model, scaler, feature_names, model_name)
+            Tuple of (model, scaler, feature_names, model_name, preprocessor, feature_engineer, feature_selector)
         """
         model_data = joblib.load(filepath)
         
@@ -271,7 +280,10 @@ class ModelTrainer:
             model_data['model'],
             model_data['scaler'],
             model_data['feature_names'],
-            model_data['model_name']
+            model_data['model_name'],
+            model_data.get('preprocessor'),
+            model_data.get('feature_engineer'),
+            model_data.get('feature_selector')
         )
 
 

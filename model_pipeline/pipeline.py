@@ -316,7 +316,10 @@ class DeliveryTimePipeline:
         saved_path = self.trainer.save_model(
             self.best_model,
             self.best_model_name,
-            filepath
+            filepath,
+            preprocessor=self.preprocessor,
+            feature_engineer=self.feature_engineer,
+            feature_selector=self.feature_selector
         )
         
         print(f"\nModel saved to: {saved_path}")

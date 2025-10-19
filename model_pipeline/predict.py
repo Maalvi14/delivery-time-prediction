@@ -73,7 +73,14 @@ class DeliveryTimePredictor:
         self.feature_names = model_data['feature_names']
         self.model_name = model_data['model_name']
         
+        # Load preprocessing components if available
+        self.preprocessor = model_data.get('preprocessor')
+        self.feature_engineer = model_data.get('feature_engineer')
+        self.feature_selector = model_data.get('feature_selector')
+        
         self.logger.info(f"Loaded model: {self.model_name} from {model_path}")
+        if self.preprocessor is not None:
+            self.logger.info("Preprocessing pipeline components loaded")
     
     def fit_pipeline(
         self,
@@ -204,7 +211,7 @@ class DeliveryTimePredictor:
             return result
         
         return predictions
-    
+        
     def predict_single(self, **kwargs) -> float:
         """
         Make prediction for a single order.
