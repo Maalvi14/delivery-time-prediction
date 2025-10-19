@@ -3,7 +3,11 @@ Quick test script to verify the model pipeline works correctly.
 """
 
 import pandas as pd
+import sys
 from pathlib import Path
+
+# Add parent directory to path to import model_pipeline
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from model_pipeline import DeliveryTimePipeline, DeliveryTimePredictor
 
@@ -20,7 +24,7 @@ def test_full_pipeline():
     pipeline = DeliveryTimePipeline(verbose=True)
     
     # Check if data exists
-    data_path = Path('data/Food_Delivery_Times.csv')
+    data_path = Path(__file__).parent.parent / 'data/Food_Delivery_Times.csv'
     if not data_path.exists():
         print(f"❌ Error: Data file not found at {data_path}")
         return False
