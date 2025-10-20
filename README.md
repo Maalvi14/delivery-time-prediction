@@ -62,7 +62,9 @@ This will:
 uv run run_api.py
 ```
 
-The server will start on `http://localhost:8000` by default. API documentation is available at `http://localhost:8000/docs`.
+The server will start on `http://localhost:8000` by default.
+
+API documentation*is available at `http://localhost:8000/docs`. **You can test the API directly from Docs.**
 
 ### Model Auto-Discovery
 
