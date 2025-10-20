@@ -115,7 +115,7 @@ Trains 12 regression models:
 
 ### 1. Test the Pipeline
 ```bash
-python test_pipeline.py
+python tests/test_pipeline.py
 ```
 
 This will:
@@ -282,7 +282,7 @@ The pipeline creates:
 Run the test to verify everything works:
 
 ```bash
-python test_pipeline.py
+python tests/test_pipeline.py
 ```
 
 Expected output:
@@ -303,7 +303,7 @@ Expected output:
 To understand the pipeline:
 
 1. Read `model_pipeline/README.md`
-2. Run `test_pipeline.py`
+2. Run `tests/test_pipeline.py`
 3. Try `examples/train_model.py`
 4. Try `examples/make_predictions.py`
 5. Explore `examples/custom_pipeline.py`
@@ -374,7 +374,7 @@ cv_results = evaluator.cross_validate_models(
 ## 🎯 Next Steps
 
 1. ✅ Pipeline created
-2. ⏭️ Run `python test_pipeline.py`
+2. ⏭️ Run `python tests/test_pipeline.py`
 3. ⏭️ Explore examples in `model_pipeline/examples/`
 4. ⏭️ Customize configuration for your needs
 5. ⏭️ Integrate into your application
