@@ -212,7 +212,6 @@ delivery-time-prediction/
 ├── model_notes.md                        # Model development notes
 ├── PIPELINE_SUMMARY.md                   # Pipeline summary
 ├── strategic_reflections.md              # Strategic insights
-├── v1 DS Technical Assessment.pdf        # Technical assessment document
 └── README.md                             # This file
 ```
 
