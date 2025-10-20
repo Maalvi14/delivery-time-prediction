@@ -59,7 +59,7 @@ This will:
 
 ```bash
 # Start the FastAPI server
-uv run python run_api.py
+uv run run_api.py
 ```
 
 The server will start on `http://localhost:8000` by default. API documentation is available at `http://localhost:8000/docs`.
