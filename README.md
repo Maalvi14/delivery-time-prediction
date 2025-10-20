@@ -40,7 +40,7 @@ uv sync
 
 ```bash
 # Train the model using the example script
-uv run python model_pipeline/examples/train_model.py
+uv run model_pipeline/examples/train_model.py
 ```
 
 This will:
